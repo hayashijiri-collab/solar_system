@@ -234,7 +234,7 @@ function checkEclipse(jd){
   return {solarKind,lunarKind,solarAngle,shadowAngle,latDeg:moon.latDeg};
 }
 
-const MAX_SUBSTEP=0.04;
+const MAX_SUBSTEP=0.01;
 function scanEclipses(jd0,jd1){
   const found=[];
   const steps=Math.max(1,Math.ceil((jd1-jd0)/MAX_SUBSTEP));
