@@ -234,7 +234,7 @@ function checkEclipse(jd){
   return {solarKind,lunarKind,solarAngle,shadowAngle,latDeg:moon.latDeg};
 }
 
-const MAX_SUBSTEP=0.4;
+const MAX_SUBSTEP=0.04;
 function scanEclipses(jd0,jd1){
   const found=[];
   const steps=Math.max(1,Math.ceil((jd1-jd0)/MAX_SUBSTEP));
@@ -286,8 +286,15 @@ document.getElementById('focus').onchange=function(){fm=parseInt(this.value);};
 
 const logEl=document.getElementById('eclipseLog');
 let logs=[];
+let loggedEvents=new Set();
 function renderLog(){logEl.innerHTML=logs.length?logs.join(' | '):'検出した日食・月食がここに記録されます';}
-function addLog(msg){logs.push(msg);if(logs.length>16)logs.shift();renderLog();}
+function addLog(key,msg){
+  if(loggedEvents.has(key)) return;
+  loggedEvents.add(key);
+  logs.push(msg);
+  if(logs.length>16) logs.shift();
+  renderLog();
+}
 document.getElementById('resetLog').onclick=function(){logs=[];renderLog();};
 
 function draw(jd){
