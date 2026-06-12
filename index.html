@@ -287,15 +287,25 @@ document.getElementById('focus').onchange=function(){fm=parseInt(this.value);};
 const logEl=document.getElementById('eclipseLog');
 let logs=[];
 let loggedEvents=new Set();
-function renderLog(){logEl.innerHTML=logs.length?logs.join(' | '):'検出した日食・月食がここに記録されます';}
+function renderLog(){
+  logEl.innerHTML=logs.length
+    ? logs.join(' | ')
+    : '検出した日食・月食がここに記録されます';
+}
 function addLog(key,msg){
   if(loggedEvents.has(key)) return;
   loggedEvents.add(key);
   logs.push(msg);
-  if(logs.length>16) logs.shift();
+  if(logs.length>16){
+    logs.shift();
+  }
   renderLog();
 }
-document.getElementById('resetLog').onclick=function(){logs=[];renderLog();};
+document.getElementById('resetLog').onclick=function(){
+  logs=[];
+  loggedEvents.clear();
+  renderLog();
+};
 
 function draw(jd){
   ctx.clearRect(0,0,W,H);ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
@@ -355,9 +365,18 @@ function loop(ts){
     if(last!==null){
       const ddays=Math.min((ts-last)/1000,0.1)*speed;
       scanEclipses(currentJD,currentJD+ddays).forEach(f=>{
-        const ds=jdToStr(f.jd);
-        const lbl=f.type==='solar'?(f.kind==='total'?'🌑皆既/金環日食':'🌒部分日食'):(f.kind==='total'?'🌕皆既月食':f.kind==='partial'?'🌔部分月食':'🌓半影月食');
-        addLog(lbl+': '+ds.display);
+       const ds=jdToStr(f.jd);
+       const lbl=f.type==='solar'
+        ?(f.kind==='total'
+          ?'🌑皆既/金環日食'
+          :'🌒部分日食')
+        :(f.kind==='total'
+          ?'🌕皆既月食'
+          :f.kind==='partial'
+          ?'🌔部分月食'
+          :'🌓半影月食');
+       const key=f.type+'-'+f.kind+'-'+ds.display;
+       addLog(key,lbl+': '+ds.display);
       });
       currentJD+=ddays;
     }
