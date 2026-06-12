@@ -2,12 +2,24 @@
   "name": "太陽系シミュレーター",
   "short_name": "太陽系",
   "description": "日食・月食を検出できる太陽系シミュレーター",
-  "start_url": "/",
+
+  "start_url": "/solar_system/",
+  "scope": "/solar_system/",
+
   "display": "standalone",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
+
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }
