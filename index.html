@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>太陽系シミュレーター - 日食・月食検出</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 12px;
+    letter-spacing: 0.02em;
+  }
+  .controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  label { font-size: 13px; color: #aaa; }
+  input[type="date"], select {
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: #1a1a2a;
+    color: #e0e0e0;
+    cursor: pointer;
+  }
+  input[type="range"] { width: 90px; cursor: pointer; accent-color: #5588ff; }
+  button {
+    font-size: 13px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background: #1e2035;
+    color: #ddd;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover { background: #2a2d50; }
+  canvas {
+    width: 100%;
+    max-width: 700px;
+    border-radius: 10px;
+    background: #000;
+    display: block;
+  }
+  .status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 16px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #2a2a3a;
+    background: #111120;
+    font-size: 12px;
+    margin-top: 8px;
+    max-width: 700px;
+  }
+  .log-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    max-width: 700px;
+  }
+  .log-header span { font-size: 12px; color: #888; flex: 1; }
+  #eclipseLog {
+    margin-top: 4px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #111120;
+    font-size: 12px;
+    color: #888;
+    min-height: 28px;
+    line-height: 1.9;
+    max-width: 700px;
+    word-break: break-all;
+  }
+  .legend {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #666;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    max-width: 700px;
+  }
+  .legend .solar-total   { color: #ffcc00; }
+  .legend .solar-partial { color: #ffaa44; }
+  .legend .lunar-total   { color: #e04020; }
+  .legend .lunar-partial { color: #c06820; }
+  .legend .lunar-penum   { color: #887040; }
+  footer {
+    margin-top: 20px;
+    font-size: 11px;
+    color: #444;
+    max-width: 700px;
+  }
+</style>
+<link rel="icon" type="image/x-icon" href="icons/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#0a0a0f">
+<meta property="og:title" content="太陽系シミュレーター">
+<meta property="og:description" content="日食・月食を検出できる太陽系シミュレーター。実際の軌道データに基づいた高精度シミュレーション。">
+<meta property="og:image" content="icons/og-image.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="太陽系シミュレーター">
+<meta name="twitter:description" content="日食・月食を検出できる太陽系シミュレーター">
+<meta name="twitter:image" content="icons/og-image.png">
+</head>
+<body>
+<h1>🌍 太陽系シミュレーター</h1>
+
+<div class="controls">
+  <input type="date" id="dateInput">
+  <button id="todayBtn">今日</button>
+  <button id="btnPlay" style="min-width:80px">再生</button>
+  <label>速度</label>
+  <input type="range" id="speed" min="1" max="120" step="1" value="15">
+  <span id="speedOut" style="font-size:13px;font-weight:500;min-width:40px">15日/s</span>
+  <select id="focus">
+    <option value="0">全体表示</option>
+    <option value="1">地球付近</option>
+  </select>
+</div>
+
+<canvas id="c" width="700" height="460"></canvas>
+
+<div class="status-grid">
+  <span>📅 <strong id="dateDisplay">-</strong> <span id="moonPhase"></span></span>
+  <span id="angleInfo" style="color:#666"></span>
+  <span id="eclipseStatus" style="color:#666">日食: なし</span>
+  <span id="lunarStatus"   style="color:#666">月食: なし</span>
+</div>
+
+<div class="log-header">
+  <span>記録</span>
+  <button id="resetLog">履歴リセット</button>
+</div>
+<div id="eclipseLog">検出した日食・月食がここに記録されます</div>
+
+<div class="legend">
+  <span>日食: <span class="solar-total">●皆既/金環</span> <span class="solar-partial">●部分</span></span>
+  <span>月食: <span class="lunar-total">●皆既</span> <span class="lunar-partial">●部分</span> <span class="lunar-penum">●半影</span></span>
+</div>
+
+<footer>軌道計算: J2000.0 基準 ELP2000近似式 / 月の黄緯を考慮した3D判定 / 部分食・半影食を含む3段階検出</footer>
+
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const W=canvas.width,H=canvas.height,J2000=2451545.0,DR=Math.PI/180;
+
+function dateToJD(d){
+  const y=d.getUTCFullYear(),m=d.getUTCMonth()+1,dd=d.getUTCDate();
+  const A=Math.floor((14-m)/12),yy=y+4800-A,mm=m+12*A-3;
+  return dd+Math.floor((153*mm+2)/5)+365*yy+Math.floor(yy/4)-Math.floor(yy/100)+Math.floor(yy/400)-32045-0.5;
+}
+function jdToStr(jd){
+  const z=Math.floor(jd+0.5);let a=z;
+  if(z>=2299161){const g=Math.floor((z-1867216.25)/36524.25);a=z+1+g-Math.floor(g/4);}
+  const b=a+1524,c=Math.floor((b-122.1)/365.25),d=Math.floor(365.25*c),e=Math.floor((b-d)/30.6001);
+  const day=b-d-Math.floor(30.6001*e),mo=e<14?e-1:e-13,yr=mo>2?c-4716:c-4715;
+  return {
+    display:`${yr}年${mo}月${day}日`,
+    input:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+  };
+}
+
+function getEarth(jd){
+  const T=(jd-J2000)/36525;
+  const e=0.016708634-0.000042037*T;
+  const M=(357.52911+35999.05029*T)*DR;
+  const C=((1.914602-0.004817*T)*Math.sin(M)+(0.019993-0.000101*T)*Math.sin(2*M)+0.000289*Math.sin(3*M))*DR;
+  const sunLon=(280.46646+36000.76983*T)*DR+C;
+  const r=1.000001018*(1-e*e)/(1+e*Math.cos(M+C));
+  return {x:r*Math.cos(sunLon+Math.PI),y:r*Math.sin(sunLon+Math.PI),r};
+}
+
+function getMoon(jd){
+  const T=(jd-J2000)/36525;
+  const Lp=(218.3164477+481267.88123421*T)*DR;
+  const D=(297.8501921+445267.1114034*T)*DR;
+  const M=(357.5291092+35999.0502909*T)*DR;
+  const Mp=(134.9633964+477198.8675055*T)*DR;
+  const F=(93.2720950+483202.0175233*T)*DR;
+  const dLon=(6288774*Math.sin(Mp)+1274027*Math.sin(2*D-Mp)+658314*Math.sin(2*D)
+    +213618*Math.sin(2*Mp)-185116*Math.sin(M)-114332*Math.sin(2*F)
+    +58793*Math.sin(2*D-2*Mp)+57066*Math.sin(2*D-M-Mp)
+    +53322*Math.sin(2*D+Mp)+45758*Math.sin(2*D-M))/1e6;
+  const dLat=(5128122*Math.sin(F)+280602*Math.sin(Mp+F)+277693*Math.sin(Mp-F)
+    +173237*Math.sin(2*D-F)+55413*Math.sin(2*D-Mp+F)+46271*Math.sin(2*D-Mp-F)
+    +32573*Math.sin(2*D+F)+17198*Math.sin(2*Mp+F))/1e6;
+  const dR=(-20905355*Math.cos(Mp)-3699111*Math.cos(2*D-Mp)-2955968*Math.cos(2*D)
+    -569925*Math.cos(2*Mp)+246158*Math.cos(2*D-2*Mp)-204586*Math.cos(2*D-M-Mp))/1000;
+  const distAU=(385000.56+dR)/149597870.7;
+  const lon=Lp+dLon*DR,lat=dLat*DR;
+  return {
+    gx:distAU*Math.cos(lat)*Math.cos(lon),
+    gy:distAU*Math.cos(lat)*Math.sin(lon),
+    latDeg:dLat,distAU
+  };
+}
+
+function checkEclipse(jd){
+  const earth=getEarth(jd),moon=getMoon(jd);
+  const sunAR=0.26645/earth.r;
+  const moonAR=0.27245*(384400/149597870.7)/moon.distAU;
+  const dot=(-earth.x)*moon.gx+(-earth.y)*moon.gy;
+  const cosA=dot/(earth.r*moon.distAU);
+  const solarAngle=Math.acos(Math.max(-1,Math.min(1,cosA)))/DR;
+  const shadowAngle=180-solarAngle;
+  const earthAR=(6371/149597870.7)/DR/moon.distAU;
+  const umbraR=earthAR-sunAR;
+  const penumbraR=earthAR+sunAR;
+  const lat=Math.abs(moon.latDeg);
+  const solarKind=lat<2.0?(solarAngle<Math.abs(sunAR-moonAR)?'total':solarAngle<sunAR+moonAR?'partial':'none'):'none';
+  const lunarKind=lat<1.8?(shadowAngle<umbraR-moonAR?'total':shadowAngle<umbraR+moonAR?'partial':shadowAngle<penumbraR+moonAR?'penumbra':'none'):'none';
+  return {solarKind,lunarKind,solarAngle,shadowAngle,latDeg:moon.latDeg};
+}
+
+const MAX_SUBSTEP=0.4;
+function scanEclipses(jd0,jd1){
+  const found=[];
+  const steps=Math.max(1,Math.ceil((jd1-jd0)/MAX_SUBSTEP));
+  const dt=(jd1-jd0)/steps;
+  let prev={solarKind:'none',lunarKind:'none'};
+  for(let i=0;i<=steps;i++){
+    const jd=jd0+i*dt,ec=checkEclipse(jd);
+    if(ec.solarKind!=='none'&&prev.solarKind==='none') found.push({jd,type:'solar',kind:ec.solarKind});
+    else if(ec.solarKind==='total'&&prev.solarKind==='partial') found.push({jd,type:'solar',kind:'total'});
+    if(ec.lunarKind!=='none'&&prev.lunarKind==='none') found.push({jd,type:'lunar',kind:ec.lunarKind});
+    else if((ec.lunarKind==='total'&&prev.lunarKind!=='total')||(ec.lunarKind==='partial'&&prev.lunarKind==='penumbra')) found.push({jd,type:'lunar',kind:ec.lunarKind});
+    prev=ec;
+  }
+  return found;
+}
+
+const pdata=[
+  {name:'水星',a:0.387,e:0.206,L0:252.251,w:77.456,dL:149472.675,color:'#b0b0b0',r:3},
+  {name:'金星',a:0.723,e:0.007,L0:181.980,w:131.564,dL:58517.816,color:'#e8cda0',r:5},
+  {name:'地球',a:1.000,e:0.017,L0:100.465,w:102.937,dL:35999.373,color:'#4a90d9',r:6},
+  {name:'火星',a:1.524,e:0.093,L0:355.453,w:336.060,dL:19140.300,color:'#c1440e',r:4},
+  {name:'木星',a:5.203,e:0.048,L0:34.397,w:14.728,dL:3034.906,color:'#c88b3a',r:11},
+  {name:'土星',a:9.537,e:0.054,L0:49.944,w:92.432,dL:1222.114,color:'#e4d191',r:9},
+];
+function getPXY(p,jd){
+  const T=(jd-J2000)/36525,L=(((p.L0+p.dL*T)%360)+360)*DR,w=p.w*DR;
+  const M=((L-w)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+  let E=M+p.e*Math.sin(M);
+  for(let i=0;i<6;i++) E-=(E-p.e*Math.sin(E)-M)/(1-p.e*Math.cos(E));
+  const v=2*Math.atan2(Math.sqrt(1+p.e)*Math.sin(E/2),Math.sqrt(1-p.e)*Math.cos(E/2));
+  const r=p.a*(1-p.e*p.e)/(1+p.e*Math.cos(v));
+  return {x:r*Math.cos(v+w),y:r*Math.sin(v+w)};
+}
+function phaseStr(jd){
+  const T=(jd-J2000)/36525,D=(((297.8501921+445267.1114034*T)%360)+360)%360;
+  if(D<11||D>=349)return'🌑新月';if(D<79)return'🌒';if(D<101)return'🌓上弦';
+  if(D<169)return'🌔';if(D<191)return'🌕満月';if(D<259)return'🌖';if(D<281)return'🌗下弦';return'🌘';
+}
+
+let currentJD=dateToJD(new Date()),running=false,speed=15,fm=0;
+const di=document.getElementById('dateInput');
+di.value=jdToStr(currentJD).input;
+di.onchange=function(){const p=this.value.split('-');if(p.length===3){currentJD=dateToJD(new Date(Date.UTC(+p[0],+p[1]-1,+p[2])));running=false;btnPlay.textContent='再生';}};
+document.getElementById('todayBtn').onclick=function(){currentJD=dateToJD(new Date());di.value=jdToStr(currentJD).input;running=false;btnPlay.textContent='再生';};
+const btnPlay=document.getElementById('btnPlay');
+btnPlay.onclick=function(){running=!running;this.textContent=running?'一時停止':'再生';};
+document.getElementById('speed').oninput=function(){speed=parseInt(this.value);document.getElementById('speedOut').textContent=speed+'日/s';};
+document.getElementById('focus').onchange=function(){fm=parseInt(this.value);};
+
+const logEl=document.getElementById('eclipseLog');
+let logs=[];
+function renderLog(){logEl.innerHTML=logs.length?logs.join(' | '):'検出した日食・月食がここに記録されます';}
+function addLog(msg){logs.push(msg);if(logs.length>16)logs.shift();renderLog();}
+document.getElementById('resetLog').onclick=function(){logs=[];renderLog();};
+
+function draw(jd){
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  const earth=getEarth(jd),moon=getMoon(jd);
+  const moonHx=earth.x+moon.gx,moonHy=earth.y+moon.gy;
+  const scale=fm===1?Math.min(W,H)*0.42:Math.min(W,H)*0.088;
+  const ox=fm===1?W/2-earth.x*scale:W/2,oy=fm===1?H/2-earth.y*scale:H/2;
+  function s(x,y){return[ox+x*scale,oy+y*scale];}
+
+  if(fm===0){pdata.forEach(p=>{ctx.beginPath();ctx.setLineDash([2,4]);ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.lineWidth=0.7;ctx.ellipse(ox,oy,p.a*scale,p.a*Math.sqrt(1-p.e*p.e)*scale,0,0,2*Math.PI);ctx.stroke();ctx.setLineDash([]);});}
+  if(fm===1){const[ex2,ey2]=s(earth.x,earth.y);const md=Math.sqrt(moon.gx**2+moon.gy**2)*scale;ctx.beginPath();ctx.setLineDash([2,4]);ctx.strokeStyle='rgba(150,180,255,0.2)';ctx.lineWidth=0.8;ctx.arc(ex2,ey2,md,0,2*Math.PI);ctx.stroke();ctx.setLineDash([]);}
+
+  const sunR=fm===1?20:13;
+  const g=ctx.createRadialGradient(ox,oy,0,ox,oy,sunR*2);
+  g.addColorStop(0,'#fffde0');g.addColorStop(0.3,'#ffcc00');g.addColorStop(1,'rgba(255,150,0,0)');
+  ctx.beginPath();ctx.arc(ox,oy,sunR*2,0,2*Math.PI);ctx.fillStyle=g;ctx.fill();
+  ctx.beginPath();ctx.arc(ox,oy,sunR,0,2*Math.PI);ctx.fillStyle='#ffcc00';ctx.fill();
+
+  const pos=pdata.map(p=>getPXY(p,jd));
+  pos.forEach((p,i)=>{
+    if(fm===1&&i!==2&&i>3)return;
+    const[px,py]=s(p.x,p.y),pr=(fm===1&&i!==2)?Math.max(pdata[i].r-2,2):pdata[i].r;
+    ctx.beginPath();ctx.arc(px,py,pr,0,2*Math.PI);ctx.fillStyle=pdata[i].color;ctx.fill();
+    if(i===5){ctx.beginPath();ctx.ellipse(px,py,pr*2.2,pr*0.5,0.3,0,2*Math.PI);ctx.strokeStyle='rgba(228,209,145,0.5)';ctx.lineWidth=2;ctx.stroke();}
+    if(fm===0){ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='11px sans-serif';ctx.fillText(pdata[i].name,px+pr+2,py+3);}
+  });
+
+  const ec=checkEclipse(jd);
+  const[ex,ey]=s(earth.x,earth.y),[mx,my]=s(moonHx,moonHy);
+  ctx.beginPath();ctx.arc(ex,ey,fm===1?8:6,0,2*Math.PI);ctx.fillStyle='#4a90d9';ctx.fill();
+  const mc=ec.lunarKind==='total'?'#c02010':ec.lunarKind==='partial'?'#a04010':ec.lunarKind==='penumbra'?'#806030':ec.solarKind!=='none'?'#ffee88':'#d0d0d0';
+  ctx.beginPath();ctx.arc(mx,my,fm===1?3:2,0,2*Math.PI);ctx.fillStyle=mc;ctx.fill();
+  if(fm===1){ctx.fillStyle='rgba(255,255,255,0.55)';ctx.font='12px sans-serif';ctx.fillText('地球',ex+10,ey+4);ctx.fillText('月',mx+5,my-6);ctx.fillText('太陽',ox+sunR+5,oy+4);}
+
+  const ds=jdToStr(jd);
+  document.getElementById('dateDisplay').textContent=ds.display;
+  document.getElementById('moonPhase').textContent=phaseStr(jd);
+  document.getElementById('angleInfo').textContent=`太陽-月: ${ec.solarAngle.toFixed(3)}°  影ずれ: ${ec.shadowAngle.toFixed(3)}°  黄緯: ${ec.latDeg.toFixed(3)}°`;
+  di.value=ds.input;
+
+  const seEl=document.getElementById('eclipseStatus'),leEl=document.getElementById('lunarStatus');
+  if(ec.solarKind!=='none'){
+    const lbl=ec.solarKind==='total'?'🌑 皆既/金環日食':'🌒 部分日食';
+    seEl.textContent=lbl+` (${ec.solarAngle.toFixed(3)}°)`;
+    seEl.style.color=ec.solarKind==='total'?'#ffcc00':'#ffaa44';
+  } else {seEl.textContent='日食: なし';seEl.style.color='#666';}
+  if(ec.lunarKind!=='none'){
+    const lbl=ec.lunarKind==='total'?'🌕 皆既月食':ec.lunarKind==='partial'?'🌔 部分月食':'🌓 半影月食';
+    leEl.textContent=lbl+` (${ec.shadowAngle.toFixed(3)}°)`;
+    leEl.style.color=ec.lunarKind==='total'?'#e04020':ec.lunarKind==='partial'?'#c06820':'#887040';
+  } else {leEl.textContent='月食: なし';leEl.style.color='#666';}
+}
+
+let last=null;
+function loop(ts){
+  if(running){
+    if(last!==null){
+      const ddays=Math.min((ts-last)/1000,0.1)*speed;
+      scanEclipses(currentJD,currentJD+ddays).forEach(f=>{
+        const ds=jdToStr(f.jd);
+        const lbl=f.type==='solar'?(f.kind==='total'?'🌑皆既/金環日食':'🌒部分日食'):(f.kind==='total'?'🌕皆既月食':f.kind==='partial'?'🌔部分月食':'🌓半影月食');
+        addLog(lbl+': '+ds.display);
+      });
+      currentJD+=ddays;
+    }
+    last=ts;
+  } else last=null;
+  draw(currentJD);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
